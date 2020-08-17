@@ -1,11 +1,9 @@
 # frozen_string_literal: true
 
-require 'telegram/bot'
-require 'net/http'
-require 'json'
-
 class TelegramBot
-  TOKEN = '1199151010:AAElgpJvKlu2bRo3VMj1-GKu0wRVoCWEJn0'
+  include Queryable
+
+  TOKEN = ENV['TICKET_BOT_TOKEN']
 
   def run
     Telegram::Bot::Client.run(TOKEN) do |bot|
@@ -54,8 +52,8 @@ class TelegramBot
     when 'schedule'
       routes = get_request('http://localhost:4567/routes')
 
-      response_message = routes.map do |route|
-        "Route id:#{route['id']}\n"\
+      response_message = routes.map.with_index do |route, index|
+        "Route##{index + 1}\n"\
         "Route name: #{route['name']}\n"\
         "Departure time: #{route['departure_time']}\n"\
         "Arrival time: #{route['arrival_time']}\n"\
@@ -123,8 +121,8 @@ class TelegramBot
 
     return send_message('No tickets found for such passenger', @markup) unless tickets
 
-    response_message = tickets.map do |ticket|
-      "Ticket id: #{ticket['id']}\n"\
+    response_message = tickets.map.with_index do |ticket, index|
+      "Ticket##{index + 1}\n"\
       "First name: #{ticket['first_name']}\n"\
       "Last name: #{ticket['last_name']}\n"\
       "Route name: #{ticket['route_name']}\n"\
@@ -135,18 +133,6 @@ class TelegramBot
     send_message("Passenger's tickets:\n#{response_message}", @markup)
   end
 
-  def get_request(url, body = '')
-    uri = URI(url)
-
-    set_connection(uri)
-
-    req = Net::HTTP::Get.new(uri)
-    req['Content-Type'] = 'application/json'
-    req.body = body.to_json
-
-    parse_response(req)
-  end
-
   def send_message(message_body, reply_markup = nil)
     if reply_markup
       @bot.api.send_message(chat_id: @chat_id, text: message_body, reply_markup: reply_markup)
@@ -154,28 +140,4 @@ class TelegramBot
       @bot.api.send_message(chat_id: @chat_id, text: message_body)
     end
   end
-
-  def parse_response(req)
-    res = @http.request(req)
-    JSON.parse(res.body) unless res.body.empty?
-  end
-
-  def set_connection(uri)
-    @http = Net::HTTP.new(uri.host, uri.port)
-    @http.use_ssl = true if uri.instance_of?(URI::HTTPS)
-  end
-
-  def post_request(url, body = '')
-    uri = URI(url)
-
-    set_connection(uri)
-
-    req = Net::HTTP::Post.new(uri)
-    req['Content-Type'] = 'application/json'
-    req.body = body.to_json
-
-    @http.request(req)
-  end
 end
-
-TelegramBot.new.run
